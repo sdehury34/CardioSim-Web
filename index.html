@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CardioSim — Software Pipeline for Echocardiography Patch</title>
+  <meta name="description" content="End-to-end GPU-accelerated ultrasound simulation and reconstruction pipeline for wearable cardiac imaging.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #09090b;
+      --bg-1: #0f0f12;
+      --bg-2: #16161a;
+      --bg-3: #1c1c22;
+      --bg-hover: #22222a;
+      --border: rgba(255,255,255,0.06);
+      --border-h: rgba(255,255,255,0.1);
+      --t1: #fafafa;
+      --t2: #a1a1aa;
+      --t3: #63636e;
+      --green: #4ade80;
+      --green-dim: rgba(74,222,128,0.12);
+      --green-mid: rgba(74,222,128,0.25);
+      --cyan: #22d3ee;
+      --mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+      --sans: 'Outfit', system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg-0);
+      color: var(--t2);
+      line-height: 1.65;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    ::selection { background: var(--green-mid); color: var(--t1); }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; position: relative; z-index: 1; }
+    .mono { font-family: var(--mono); }
+    .green { color: var(--green); }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: var(--green);
+      background: var(--green-dim);
+      border: 1px solid rgba(74,222,128,0.15);
+      padding: 4px 12px;
+      border-radius: 4px;
+    }
+    .tag::before {
+      content: '';
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade { animation: enter 0.6s ease both; }
+    .fade-d1 { animation-delay: 0.1s; }
+    .fade-d2 { animation-delay: 0.2s; }
+    .fade-d3 { animation-delay: 0.35s; }
+    .fade-d4 { animation-delay: 0.5s; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(9,9,11,0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1080px; margin: 0 auto; padding: 0 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 52px;
+    }
+    .nav-brand {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--t1);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-brand span { color: var(--green); }
+    .nav-links { display: flex; gap: 1.75rem; list-style: none; }
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--t3);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--t2); }
+
+    .hero {
+      padding: 9rem 0 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -120px; left: 50%;
+      width: 800px; height: 500px;
+      transform: translateX(-50%);
+      background: radial-gradient(ellipse, rgba(74,222,128,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-prompt {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--t3);
+      margin-bottom: 1.5rem;
+    }
+    .hero-prompt .caret {
+      display: inline-block;
+      width: 8px; height: 16px;
+      background: var(--green);
+      margin-left: 4px;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    h1 {
+      font-family: var(--sans);
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 700;
+      color: var(--t1);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+    h1 .hl {
+      background: linear-gradient(135deg, var(--green), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--t2);
+      max-width: 560px;
+      line-height: 1.7;
+      font-weight: 300;
+      margin-bottom: 2.5rem;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .stat {
+      background: var(--bg-1);
+      padding: 1.25rem 1.5rem;
+      transition: background 0.2s;
+    }
+    .stat:hover { background: var(--bg-2); }
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--t1);
+      letter-spacing: -0.02em;
+    }
+    .stat-val .unit {
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: var(--t3);
+      margin-left: 2px;
+    }
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--t3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    section { padding: 5rem 0; }
+    .section-rule { height: 1px; background: var(--border); margin: 0 auto; max-width: 1080px; }
+    .section-head { margin-bottom: 2.5rem; }
+    .section-head .num {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--t3);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-family: var(--sans);
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: var(--t1);
+      letter-spacing: -0.025em;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .pipe {
+      background: var(--bg-1);
+      padding: 2rem 1.75rem;
+      position: relative;
+      transition: background 0.25s;
+    }
+    .pipe:hover { background: var(--bg-2); }
+    .pipe-idx {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--bg-3);
+      position: absolute;
+      top: 1.25rem; right: 1.5rem;
+      line-height: 1;
+    }
+    .pipe:hover .pipe-idx { color: rgba(74,222,128,0.1); }
+    .pipe-tag {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--green);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    .pipe h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--t1);
+      margin-bottom: 0.6rem;
+      letter-spacing: -0.01em;
+    }
+    .pipe p {
+      font-size: 0.85rem;
+      color: var(--t3);
+      line-height: 1.65;
+    }
+    .pipe code {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      background: var(--green-dim);
+      color: var(--green);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stack-item {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      transition: all 0.25s;
+    }
+    .stack-item:hover { border-color: var(--border-h); background: var(--bg-2); }
+    .stack-name {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--t1);
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stack-name .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .stack-desc { font-size: 0.78rem; color: var(--t3); line-height: 1.6; }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .result-card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: all 0.25s;
+    }
+    .result-card:hover { border-color: var(--border-h); }
+    .result-ph {
+      aspect-ratio: 16/10;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 5px, rgba(74,222,128,0.015) 5px, rgba(74,222,128,0.015) 6px),
+        var(--bg-0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .result-ph::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 50%;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      transform: translateX(-50%) translateY(50%);
+      border: 1px solid rgba(74,222,128,0.08);
+    }
+    .result-ph::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 50%;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      transform: translateX(-50%) translateY(50%);
+      border: 1px solid rgba(74,222,128,0.05);
+    }
+    .result-ph span {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--t3);
+      text-align: center;
+      z-index: 1;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    .result-card img {
+      width: 100%;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      display: block;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-info { padding: 1rem 1.25rem; }
+    .result-info h4 { font-size: 0.82rem; font-weight: 500; color: var(--t1); margin-bottom: 3px; }
+    .result-info p { font-family: var(--mono); font-size: 0.68rem; color: var(--t3); }
+
+    .access {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem 2.5rem;
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
+      margin-top: 3rem;
+    }
+    .access-icon {
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      background: var(--green-dim);
+      border: 1px solid rgba(74,222,128,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .access-icon svg { width: 18px; height: 18px; }
+    .access h3 { font-size: 0.95rem; font-weight: 500; color: var(--t1); margin-bottom: 0.4rem; }
+    .access p { font-size: 0.85rem; color: var(--t3); line-height: 1.7; }
+    .access a {
+      color: var(--green);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(74,222,128,0.3);
+      transition: border-color 0.2s;
+    }
+    .access a:hover { border-color: var(--green); }
+
+    footer {
+      padding: 2.5rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    footer p {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--t3);
+      letter-spacing: 0.02em;
+    }
+
+    @media (max-width: 768px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .pipeline { grid-template-columns: 1fr; }
+      .stack-grid { grid-template-columns: 1fr 1fr; }
+      .results-grid { grid-template-columns: 1fr; }
+      .about-grid { grid-template-columns: 1fr !important; }
+      .access { flex-direction: column; gap: 1rem; }
+      .hero { padding: 7rem 0 3rem; }
+    }
+    @media (max-width: 480px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      .stack-grid { grid-template-columns: 1fr; }
+      .nav-links { gap: 1rem; }
+      .nav-links a { font-size: 0.65rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="nav-brand"><span>~</span>/cardiosim</a>
+      <ul class="nav-links">
+        <li><a href="#pipeline">pipeline</a></li>
+        <li><a href="#stack">stack</a></li>
+        <li><a href="#results">results</a></li>
+        <li><a href="#about">about</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="container">
+      <div class="hero-prompt fade">
+        <span class="green">$</span> cardiosim <span style="color:var(--t3)">--simulate --reconstruct --gpu</span><span class="caret"></span>
+      </div>
+      <h1 class="fade fade-d1">
+        Software pipeline for<br><span class="hl">echocardiography patch</span>
+      </h1>
+      <p class="hero-desc fade fade-d2">
+        End-to-end simulation and reconstruction for a 128-channel
+        wearable multi-view cardiac ultrasound patch. Physics-based RF
+        generation on GPU, DAS beamforming, B-mode imaging.
+      </p>
+      <div class="tag fade fade-d3">PhD Research &middot; Singapore Institute of Technology</div>
+      <div class="stats fade fade-d4" style="margin-top: 3rem;">
+        <div class="stat">
+          <div class="stat-val">128</div>
+          <div class="stat-label">channels</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">64</div>
+          <div class="stat-label">diverging waves</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">~31<span class="unit">&times;</span></div>
+          <div class="stat-label">gpu speedup</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">2.7<span class="unit">MHz</span></div>
+          <div class="stat-label">carrier frequency</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-rule"></div>
+
+  <section id="pipeline">
+    <div class="container">
+      <div class="section-head">
+        <div class="num mono">01</div>
+        <h2>Pipeline</h2>
+      </div>
+      <div class="pipeline">
+        <div class="pipe">
+          <div class="pipe-idx">01</div>
+          <div class="pipe-tag">phantom</div>
+          <h3>Scatterer generation</h3>
+          <p>Digital cardiac phantoms converted into intensity-weighted acoustic scatterer maps. Up to <code>50,000</code> scatterers across a 10&thinsp;cm &times; 10&thinsp;cm field of view.</p>
+        </div>
+        <div class="pipe">
+          <div class="pipe-idx">02</div>
+          <div class="pipe-tag">transmit</div>
+          <h3>RF data simulation</h3>
+          <p><code>64</code> diverging-wave transmissions at &plusmn;45&deg; from a virtual source at &minus;4&thinsp;cm. JAX/XLA GPU engine generates raw RF at <code>10.8&thinsp;MHz</code> sampling.</p>
+        </div>
+        <div class="pipe">
+          <div class="pipe-idx">03</div>
+          <div class="pipe-tag">reconstruct</div>
+          <h3>Beamforming &amp; imaging</h3>
+          <p>Delay-and-Sum with Hanning receive apodisation. Coherent compounding, envelope detection, and <code>60&thinsp;dB</code> log-compression to produce B-mode sector images.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-rule"></div>
+
+  <section id="stack">
+    <div class="container">
+      <div class="section-head">
+        <div class="num mono">02</div>
+        <h2>Technical stack</h2>
+      </div>
+      <div class="stack-grid">
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:#facc15"></span>JAX / XLA</div>
+          <div class="stack-desc">GPU-native RF simulation via jit() and vmap(). ~31&times; speedup over CPU baselines.</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:#60a5fa"></span>UltraSpy</div>
+          <div class="stack-desc">DAS beamforming engine with GPU/CPU fallback, polar scan geometry, envelope detection.</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:#f87171"></span>MATLAB / MUST</div>
+          <div class="stack-desc">Reference SIR-based simulation for cross-platform validation and benchmarking.</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:var(--green)"></span>PyMUST</div>
+          <div class="stack-desc">Standalone Python reimplementation of MUST for CPU-based RF generation and validation.</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:#c084fc"></span>FPGA back-end</div>
+          <div class="stack-desc">Disaggregated hardware architecture with flexible piezoelectric array on PDMS substrate.</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name"><span class="dot" style="background:var(--cyan)"></span>OpenCV / SciPy</div>
+          <div class="stack-desc">Image processing, bandpass filtering, and quality metrics — SSIM, SNR, CNR, FWHM.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-rule"></div>
+
+  <section id="results">
+    <div class="container">
+      <div class="section-head">
+        <div class="num mono">03</div>
+        <h2>Results</h2>
+      </div>
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="result-ph">
+            <!-- Replace with: <img src="images/ground_truth.png" alt="Ground Truth"> -->
+            <span>ground_truth.png</span>
+          </div>
+          <div class="result-info">
+            <h4>Ground truth phantom</h4>
+            <p>digital cardiac input image</p>
+          </div>
+        </div>
+        <div class="result-card">
+          <div class="result-ph">
+            <!-- Replace with: <img src="images/bmode_reconstructed.png" alt="B-mode Reconstruction"> -->
+            <span>bmode_reconstructed.png</span>
+          </div>
+          <div class="result-info">
+            <h4>DAS B-mode reconstruction</h4>
+            <p>60 dB &middot; 64 compounded waves</p>
+          </div>
+        </div>
+        <div class="result-card">
+          <div class="result-ph">
+            <!-- Replace with: <img src="images/performance.png" alt="Performance"> -->
+            <span>performance_matrix.png</span>
+          </div>
+          <div class="result-info">
+            <h4>Performance benchmark</h4>
+            <p>JAX GPU vs PyMUST CPU</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="access">
+        <div class="access-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div>
+          <h3>Source code &amp; access</h3>
+          <p>
+            The source code, hardware schematics, and implementation details
+            for this project are currently private research assets and are not
+            publicly available. For academic enquiries, collaboration proposals,
+            or further information, please contact
+            <a href="mailto:somashekhar@example.com">Somashekhar</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-rule"></div>
+
+  <section id="about">
+    <div class="container">
+      <div class="section-head">
+        <div class="num mono">04</div>
+        <h2>Research context</h2>
+      </div>
+      <div class="about-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div class="stack-item">
+          <div class="stack-name" style="margin-bottom: 0.6rem;">Programme</div>
+          <div class="stack-desc">
+            PhD in Biomedical Engineering at the Singapore Institute of
+            Technology (SIT), supervised by A/Prof Alex Qiang Chen,
+            A/Prof Mahesh Raveendranatha Panicker, and Dr.&nbsp;Zainul
+            (TRICOG, industry partner).
+          </div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-name" style="margin-bottom: 0.6rem;">Scope</div>
+          <div class="stack-desc">
+            128-channel wearable multi-view echocardiography patch with a
+            disaggregated architecture: flexible piezoelectric array on PDMS
+            substrate, FPGA back-end for data acquisition, and laptop GPU
+            for real-time image reconstruction.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Somashekhar &middot; CardioSim &middot; Singapore Institute of Technology</p>
+    </div>
+  </footer>
+
+</body>
+</html>

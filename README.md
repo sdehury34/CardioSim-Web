@@ -8,20 +8,16 @@ Public project page for **CardioSim: Software Pipeline for Echocardiography Patc
 
 This repository hosts **only the project website** — a static landing page describing the CardioSim research pipeline. No source code, hardware schematics, or implementation details are included.
 
-## Adding result images
+## Repo structure
 
-1. Create an `images/` folder in this repo.
-2. Copy your result PNGs (ground truth, B-mode reconstruction, performance chart) into `images/`.
-3. In `index.html`, replace each `<div class="result-ph">` block with an `<img>` tag:
-
-```html
-<!-- Replace this: -->
-<div class="result-ph">
-  <span>bmode_reconstructed.png</span>
-</div>
-
-<!-- With this: -->
-<img src="images/bmode_reconstructed.png" alt="B-mode Reconstruction">
+```
+CardioSim-Web/
+├── index.html
+├── README.md
+├── .nojekyll
+└── images/
+    ├── cardiac_final.png
+    └── performance_one_frame.png
 ```
 
 ## Deploying with GitHub Pages
@@ -29,7 +25,7 @@ This repository hosts **only the project website** — a static landing page des
 1. Push this repo to `github.com/sdehury34/CardioSim-Web`.
 2. Go to **Settings → Pages**.
 3. Set source to **Deploy from a branch → main → / (root)**.
-4. Site goes live at `https://sdehury34.github.io/CardioSim-Web/` within a few minutes.
+4. Site goes live at `https://sdehury34.github.io/CardioSim-Web/`.
 
 ## What is NOT in this repo
 
